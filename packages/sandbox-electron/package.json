@@ -1,0 +1,17 @@
+{
+  "name": "@agk/sandbox-electron",
+  "version": "0.1.0",
+  "description": "AGK OS desktop app: Electron shell wrapping the local orchestrator",
+  "license": "MIT",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "dependencies": {
+    "electron": "^33.0.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^25.0.0"
+  }
+}

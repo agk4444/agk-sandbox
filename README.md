@@ -1,26 +1,32 @@
 # AGK Sandbox
 
-User-based sandbox for AGK OS and Hanuman. Replaces GitHub Codespaces with compute on the user's own device.
+User-based sandbox for AGK OS and Hanuman. The user owns everything: compute, storage, git. No servers, no quota, no GitHub required.
 
-## Why
+## Product Strategy (2026-10-07)
 
-GitHub Codespaces is a rented VM with a meter: quota limits, sleep/wake failures, "VM is down" errors. Every fallback in the orchestrator exists because GitHub can pull the plug.
+**Two-tier:**
 
-The sandbox runs on the **user's device**:
-- **Browser WebContainer** (Tier 1): Node.js in the browser tab. Zero install.
-- **Electron app** (Tier 2): Full desktop app. Any language. Optional.
-- **Local git**: isomorphic-git does branching/merging locally. GitHub is optional backup, not required.
+|  | Web (agkfireos.com) | Electron (desktop) |
+|---|---|---|
+| **Role** | Demo / teaser | Real product |
+| **Compute** | Plesk + Codespace (existing) | User's machine |
+| **Git** | GitHub (existing) | Local (this repo) |
+| **Limits** | Quota, feature-limited | None |
+| **CTA** | "Download the desktop app" | — |
 
-No quota. No "VM is down." User owns their compute and their code.
+The web demo drives downloads. Electron is where users work.
+
+## Decision: Electron Only
+
+No WebContainer browser sandbox. The demo doesn't need code execution (just chat). Electron has native Node.js — no browser sandbox needed.
 
 ## Packages
 
 | Package | What | Status |
 |---|---|---|
 | `@agk/sandbox-protocol` | Op types: orchestrator ↔ sandbox | ✅ Defined |
-| `@agk/sandbox-client` | Browser WebContainer client | 🚧 Phase 2 |
-| `@agk/sandbox-git` | isomorphic-git wrapper, auto-branching | 🚧 Phase 2 |
-| `@agk/sandbox-electron` | Desktop app (Mode A: connect to Plesk) | 📋 Phase 5 |
+| `@agk/sandbox-git` | Local git: native (Electron) + isomorphic (fallback) | ✅ Built |
+| `@agk/sandbox-electron` | Desktop app: orchestrator + sandbox + UI | 🚧 Building |
 
 ## Op Protocol
 
