@@ -2,10 +2,12 @@
 // Spawns the local orchestrator, opens the web UI in a BrowserWindow.
 // The user gets the full AGK OS experience as a desktop app — no terminal, no browser needed.
 
-const { app, BrowserWindow, shell } = require("electron");
+const { app, BrowserWindow, shell, dialog } = require("electron");
 const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
+const http = require("http");
+const { autoUpdater } = require("electron-updater");
 
 let mainWindow = null;
 let orchestratorProc = null;
@@ -31,6 +33,73 @@ function findAgkOsDir() {
     }
   }
   return null;
+}
+
+// Poll a port until it responds or timeout. Returns true if healthy.
+function waitForPort(port, timeoutMs = 30000) {
+  const start = Date.now();
+  return new Promise((resolve) => {
+    const check = () => {
+      const req = http.get(`http://localhost:${port}/`, (res) => {
+        res.resume();
+        resolve(true);
+      });
+      req.on("error", () => {
+        if (Date.now() - start > timeoutMs) {
+          resolve(false);
+        } else {
+          setTimeout(check, 500);
+        }
+      });
+      req.setTimeout(2000, () => req.destroy());
+    };
+    check();
+  });
+}
+
+function showFatalError(title, message) {
+  dialog.showErrorBox(title, message);
+  app.quit();
+}
+
+// Auto-updater: checks GitHub releases for new versions.
+// Configure via `publish` in electron-builder.yml.
+function setupAutoUpdater() {
+  autoUpdater.autoDownload = false; // ask first
+
+  autoUpdater.on("update-available", (info) => {
+    dialog
+      .showMessageBox({
+        type: "info",
+        title: "Update available",
+        message: `AGK OS ${info.version} is available. Download it?`,
+        buttons: ["Download", "Later"],
+      })
+      .then(({ response }) => {
+        if (response === 0) autoUpdater.downloadUpdate();
+      });
+  });
+
+  autoUpdater.on("update-downloaded", () => {
+    dialog
+      .showMessageBox({
+        type: "info",
+        title: "Update ready",
+        message: "Update downloaded. Restart to install?",
+        buttons: ["Restart", "Later"],
+      })
+      .then(({ response }) => {
+        if (response === 0) autoUpdater.quitAndInstall();
+      });
+  });
+
+  autoUpdater.on("error", (err) => {
+    console.error(`[updater] ${err.message}`);
+  });
+
+  // Check on startup (after window opens) and every 6 hours
+  setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 10000);
+  setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 3600 * 1000);
 }
 
 function startOrchestrator(agkOsDir) {
@@ -103,23 +172,46 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   const agkOsDir = findAgkOsDir();
   if (!agkOsDir) {
-    console.error("[electron] could not find agk-os repo. Set AGK_OS_DIR env var.");
-    app.quit();
+    showFatalError(
+      "AGK OS — Setup Error",
+      "Could not find the AGK OS files.\n\nSet the AGK_OS_DIR environment variable to the agk-os repo path."
+    );
     return;
   }
   console.log(`[electron] using agk-os at ${agkOsDir}`);
+
   startOrchestrator(agkOsDir);
   const webOk = startWebApp(agkOsDir);
   if (!webOk) {
-    console.error("[electron] web server failed to start — quitting");
-    app.quit();
+    showFatalError(
+      "AGK OS — Setup Error",
+      "Web UI not built.\n\nRun `npm run build` in apps/web first, then relaunch."
+    );
     return;
   }
-  // Give both servers a moment to boot before opening the window
-  setTimeout(createWindow, 4000);
+
+  // Wait for both servers to be healthy before opening the window
+  console.log("[electron] waiting for servers...");
+  const [orchOk, webHealthy] = await Promise.all([
+    waitForPort(ORCHESTRATOR_PORT, 30000),
+    waitForPort(WEB_PORT, 30000),
+  ]);
+
+  if (!orchOk) {
+    showFatalError("AGK OS — Startup Error", "Orchestrator failed to start on port 8788.\n\nCheck the logs and try again.");
+    return;
+  }
+  if (!webHealthy) {
+    showFatalError("AGK OS — Startup Error", "Web UI failed to start on port 3002.\n\nCheck the logs and try again.");
+    return;
+  }
+
+  console.log("[electron] servers healthy, opening window");
+  createWindow();
+  setupAutoUpdater();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
