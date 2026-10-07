@@ -9,6 +9,7 @@ const fs = require("fs");
 
 let mainWindow = null;
 let orchestratorProc = null;
+let webProc = null;
 
 const ORCHESTRATOR_PORT = 8788;
 const WEB_PORT = 3002;
@@ -52,10 +53,24 @@ function startOrchestrator(agkOsDir) {
 }
 
 function startWebApp(agkOsDir) {
-  // The Next.js web UI. In dev, assume `npm run dev` was run separately
-  // or use `next start` on a production build.
-  // For v1, we just point the window at the dev server.
-  // TODO: bundle `next build` output and serve via `next start`.
+  const webDir = path.join(agkOsDir, "apps", "web");
+  const nextBin = path.join(webDir, "node_modules", ".bin", "next");
+
+  if (!fs.existsSync(path.join(webDir, ".next"))) {
+    console.error("[electron] no .next build found. Run `npm run build` in apps/web first.");
+    return false;
+  }
+
+  console.log("[electron] starting Next.js production server");
+  webProc = spawn(nextBin, ["start", "-p", String(WEB_PORT)], {
+    cwd: webDir,
+    env: { ...process.env, PORT: String(WEB_PORT) },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  webProc.stdout.on("data", (d) => console.log(`[web] ${d}`.trim()));
+  webProc.stderr.on("data", (d) => console.error(`[web] ${d}`.trim()));
+  webProc.on("exit", (code) => console.log(`[electron] web server exited: ${code}`));
+  return true;
 }
 
 function createWindow() {
@@ -97,8 +112,14 @@ app.whenReady().then(() => {
   }
   console.log(`[electron] using agk-os at ${agkOsDir}`);
   startOrchestrator(agkOsDir);
-  // Give the orchestrator a moment to boot before opening the window
-  setTimeout(createWindow, 2000);
+  const webOk = startWebApp(agkOsDir);
+  if (!webOk) {
+    console.error("[electron] web server failed to start — quitting");
+    app.quit();
+    return;
+  }
+  // Give both servers a moment to boot before opening the window
+  setTimeout(createWindow, 4000);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -113,5 +134,9 @@ app.on("before-quit", () => {
   if (orchestratorProc) {
     console.log("[electron] stopping orchestrator");
     orchestratorProc.kill();
+  }
+  if (webProc) {
+    console.log("[electron] stopping web server");
+    webProc.kill();
   }
 });
