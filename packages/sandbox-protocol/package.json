@@ -1,0 +1,1 @@
+{"description":"Op protocol types for AGK sandbox (orchestrator ↔ sandbox)","license":"MIT","main":"src/index.ts","name":"@agk/sandbox-protocol","types":"src/index.ts","version":"0.1.0"}
