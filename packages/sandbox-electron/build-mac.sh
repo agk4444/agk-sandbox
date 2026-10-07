@@ -42,11 +42,23 @@ npm install
 
 # 5. Build the .dmg
 echo "Building macOS app..."
+echo ""
+echo "NOTE: For code signing, you need a 'Developer ID Application' certificate"
+echo "in your keychain. If you don't have one yet:"
+echo "  1. Open Xcode → Settings → Accounts → + → Apple ID"
+echo "  2. Select your team → Manage Certificates → + → Developer ID Application"
+echo "  3. Also create 'Developer ID Installer' for the .dmg"
+echo ""
 npm run build
 
 echo ""
 echo "=== Done! ==="
 echo "Find your app at: $ELECTRON_DIR/dist/AGK OS-*.dmg"
 echo ""
-echo "Note: The app is unsigned. On first launch, right-click → Open"
-echo "to bypass the 'unidentified developer' warning."
+if [ -z "$CSC_NAME" ]; then
+  echo "Note: Built unsigned (no CSC_NAME set). To sign, set:"
+  echo "  export CSC_NAME='Developer ID Application: Your Name (TEAMID)'"
+  echo "Then re-run this script."
+else
+  echo "Signed with: $CSC_NAME"
+fi
