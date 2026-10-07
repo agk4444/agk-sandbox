@@ -1,0 +1,32 @@
+appId: xyz.agkfire.os
+productName: AGK OS
+directories:
+  output: dist
+files:
+  - src/
+  - package.json
+extraResources:
+  # The agk-os repo gets bundled here at build time.
+  # In CI, clone agk-os into ./vendor/agk-os before running electron-builder.
+  - from: vendor/agk-os
+    to: agk-os
+    filter:
+      - services/orchestrator/**
+      - apps/web/.next/**
+      - package.json
+mac:
+  category: public.app-category.productivity
+  target:
+    - dmg
+    - zip
+win:
+  target:
+    - nsis
+linux:
+  category: Utility
+  target:
+    - AppImage
+    - deb
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
